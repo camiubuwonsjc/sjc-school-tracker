@@ -1,10 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Bulletproof production fallbacks so Vercel never fails to connect
 const supabaseUrl = 'https://yvqnjttpoiyxdybdwpcm.supabase.co'
-const supabaseAnonKey = 'sb_publishable_1mV4wOJQkWTpLyM9uZCpag_NjkzV5NN'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2cW5qdHRwb2l5eGR5YmR3cGNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU5Nzg5MjYsImV4cCI6MjAzMTU1NDkyNn0.Vcj...'
 
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL || supabaseUrl,
-  import.meta.env.VITE_SUPABASE_ANON_KEY || supabaseAnonKey
-)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
