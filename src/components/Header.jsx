@@ -3,11 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { User, LogOut, X, Shield, Home, Grid, Package, ShieldCheck, Sparkles, KeyRound, MonitorSmartphone, Loader2, CheckCircle2, Megaphone } from 'lucide-react';
 
+// Explicitly import local logo for Vite
+import sjcLogo from '../assets/logo.png';
+
 export default function Header({ user, setUser }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  
-  // Realtime Broadcast State
   const [broadcast, setBroadcast] = useState({ message: '', active: false });
   
   const [currentPassword, setCurrentPassword] = useState('');
@@ -38,7 +39,6 @@ export default function Header({ user, setUser }) {
     setDragY(0);
   };
 
-  // Live Broadcast Listener
   useEffect(() => {
     const fetchInitialBroadcast = async () => {
       const { data } = await supabase.from('broadcast').select('*').eq('id', 1).maybeSingle();
@@ -61,6 +61,7 @@ export default function Header({ user, setUser }) {
     localStorage.removeItem('sjc_active_user');
     sessionStorage.removeItem('sjc_active_user');
     setUser(null);
+    navigate('/');
   };
 
   const handleUpdatePassword = async () => {
@@ -98,7 +99,7 @@ export default function Header({ user, setUser }) {
           
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm p-1 overflow-hidden">
-              <img src="/logo.png" alt="SJC Logo" className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+              <img src={sjcLogo} alt="SJC Logo" className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
               <span style={{ display: 'none' }} className="text-[#176e57] font-black text-lg">SJC</span>
             </div>
             <div>
@@ -126,7 +127,6 @@ export default function Header({ user, setUser }) {
         </div>
       </header>
 
-      {/* Live Active Broadcast Banner */}
       {broadcast.active && (
         <div className="bg-amber-400 text-amber-900 px-4 py-2 text-center text-sm font-black flex items-center justify-center gap-2 animate-in slide-in-from-top shadow-md relative z-20 uppercase tracking-wide">
           <Megaphone className="w-4 h-4" />
