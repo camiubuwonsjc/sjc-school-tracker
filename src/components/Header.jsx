@@ -1,17 +1,19 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { User, LogOut, X, Shield, Home, Grid, Package, ShieldCheck, Sparkles, KeyRound, MonitorSmartphone, Loader2, CheckCircle2 } from 'lucide-react';
+import { User, LogOut, X, Shield, Home, Grid, Package, ShieldCheck, Sparkles, KeyRound, MonitorSmartphone, Loader2, CheckCircle2, Megaphone } from 'lucide-react';
 
-export default function Header({ user, setUser, broadcast }) {
+export default function Header({ user, setUser }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   
-  // Password States
+  // Realtime Broadcast State
+  const [broadcast, setBroadcast] = useState({ message: '', active: false });
+  
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordStatus, setPasswordStatus] = useState(null); // { type: 'error' | 'success', msg: '' }
+  const [passwordStatus, setPasswordStatus] = useState(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   const location = useLocation();
@@ -36,13 +38,31 @@ export default function Header({ user, setUser, broadcast }) {
     setDragY(0);
   };
 
+  // Live Broadcast Listener
+  useEffect(() => {
+    const fetchInitialBroadcast = async () => {
+      const { data } = await supabase.from('broadcast').select('*').eq('id', 1).maybeSingle();
+      if (data) setBroadcast({ message: data.message, active: data.active });
+    };
+    fetchInitialBroadcast();
+
+    const channel = supabase.channel('broadcast_changes')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broadcast' }, (payload) => {
+        if (payload.new.id === 1) {
+          setBroadcast({ message: payload.new.message, active: payload.new.active });
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('sjc_active_user');
     sessionStorage.removeItem('sjc_active_user');
     setUser(null);
   };
 
-  // Securely update password in DB
   const handleUpdatePassword = async () => {
     setPasswordStatus(null);
     if (!currentPassword || !newPassword || !confirmPassword) return setPasswordStatus({ type: 'error', msg: 'Please fill out all fields.' });
@@ -51,7 +71,6 @@ export default function Header({ user, setUser, broadcast }) {
 
     setIsUpdatingPassword(true);
     
-    // Step 1: Verify Current Password
     const { data: userData, error: fetchError } = await supabase.from('staff_credentials').select('password').eq('id', user.id).single();
     if (fetchError || !userData) {
       setIsUpdatingPassword(false);
@@ -62,7 +81,6 @@ export default function Header({ user, setUser, broadcast }) {
       return setPasswordStatus({ type: 'error', msg: 'Current password does not match.' });
     }
 
-    // Step 2: Update to New Password
     const { error: updateError } = await supabase.from('staff_credentials').update({ password: newPassword }).eq('id', user.id);
     if (updateError) {
       setPasswordStatus({ type: 'error', msg: 'Failed to update database.' });
@@ -77,11 +95,15 @@ export default function Header({ user, setUser, broadcast }) {
     <>
       <header className="sticky top-0 z-30 bg-[#176e57] text-white shadow-md">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
+          
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-10 h-10 bg-white text-[#176e57] rounded-xl flex items-center justify-center font-black text-xl shadow-sm">J</div>
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm p-1 overflow-hidden">
+              <img src="/logo.png" alt="SJC Logo" className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+              <span style={{ display: 'none' }} className="text-[#176e57] font-black text-lg">SJC</span>
+            </div>
             <div>
-              <h1 className="text-base md:text-lg font-black leading-tight tracking-wide">JaniTracker</h1>
-              <p className="text-[10px] md:text-xs text-emerald-100/90 font-medium">Dimasalang Hall</p>
+              <h1 className="text-base md:text-lg font-black leading-tight tracking-wide">PHINMA Saint Jude College</h1>
+              <p className="text-[10px] md:text-xs text-emerald-100/90 font-bold">Inventory and Janitory Tracker</p>
             </div>
           </div>
 
@@ -103,6 +125,14 @@ export default function Header({ user, setUser, broadcast }) {
           </button>
         </div>
       </header>
+
+      {/* Live Active Broadcast Banner */}
+      {broadcast.active && (
+        <div className="bg-amber-400 text-amber-900 px-4 py-2 text-center text-sm font-black flex items-center justify-center gap-2 animate-in slide-in-from-top shadow-md relative z-20 uppercase tracking-wide">
+          <Megaphone className="w-4 h-4" />
+          {broadcast.message}
+        </div>
+      )}
 
       {isProfileOpen && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
@@ -126,15 +156,6 @@ export default function Header({ user, setUser, broadcast }) {
             </div>
 
             <div className="overflow-y-auto space-y-4 py-4 pr-1 scrollbar-none">
-              <div className="border border-slate-200 rounded-2xl p-4">
-                <div className="flex items-center gap-2 text-[#176e57] mb-3"><Sparkles className="w-5 h-5" /><h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Experience Mode</h4></div>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm font-medium text-slate-600">Presentation Animations (ON)</span>
-                  <input type="checkbox" defaultChecked className="w-4 h-4 rounded text-[#176e57] focus:ring-[#176e57]" />
-                </label>
-              </div>
-
-              {/* Working Password Settings */}
               <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center gap-2 text-[#176e57] mb-1">
                   <KeyRound className="w-5 h-5" />
@@ -155,12 +176,6 @@ export default function Header({ user, setUser, broadcast }) {
                 <button onClick={handleUpdatePassword} disabled={isUpdatingPassword} className="w-full py-2.5 bg-[#176e57] hover:bg-[#125744] text-white font-bold rounded-xl text-sm transition-colors flex justify-center items-center gap-2">
                   {isUpdatingPassword ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : 'Update Password'}
                 </button>
-              </div>
-
-              <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-2 text-[#176e57]"><MonitorSmartphone className="w-5 h-5" /><h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Two-Factor Trusted Devices</h4></div>
-                <p className="text-xs text-slate-500 font-medium">Manage 30-day remembered accounts.</p>
-                <button onClick={() => { localStorage.removeItem('sjc_trusted_devices'); alert("Trusted devices cleared."); }} className="w-full py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-200 transition-colors">Forget All Trusted Devices</button>
               </div>
             </div>
 
