@@ -3,9 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { User, LogOut, X, Shield, Home, Grid, Package, ShieldCheck, Sparkles, KeyRound, MonitorSmartphone, Loader2, CheckCircle2, Megaphone } from 'lucide-react';
 
-// Explicitly import local logo for Vite
-import sjcLogo from '../assets/logo.png';
-
 export default function Header({ user, setUser }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -99,7 +96,7 @@ export default function Header({ user, setUser }) {
           
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm p-1 overflow-hidden">
-              <img src={sjcLogo} alt="SJC Logo" className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+              <img src="/logo.png" alt="SJC Logo" className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
               <span style={{ display: 'none' }} className="text-[#176e57] font-black text-lg">SJC</span>
             </div>
             <div>
