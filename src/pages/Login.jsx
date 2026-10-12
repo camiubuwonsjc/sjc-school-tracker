@@ -1,281 +1,168 @@
 import React, { useState } from 'react';
-import { Shield, User, Lock, KeyRound, RefreshCw } from 'lucide-react';
-import { sendVerificationOTP, getDestinationEmail } from '../lib/email';
+import { supabase } from '../lib/supabase';
+import { Loader2, Lock, User, ShieldAlert, Grid, Package } from 'lucide-react';
 
-export default function Login({ onLoginSuccess }) {
-  const [mode, setMode] = useState('staff');
-  const [tapCount, setTapCount] = useState(0);
-  const [accountId, setAccountId] = useState('');
+// Explicitly import your local assets for Vite
+import buildingBg from '../assets/building.jpg';
+import sjcLogo from '/logo.png';
+
+export default function Login({ setUser }) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [trustDevice, setTrustDevice] = useState(false);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
 
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [generatedOtp, setGeneratedOtp] = useState('');
-  const [inputOtp, setInputOtp] = useState('');
-  const [otpError, setOtpError] = useState('');
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [isExiting, setIsExiting] = useState(false);
-
-  // 5-Tap Logo Easter Egg to Toggle Admin / Staff
-  const handleLogoClick = () => {
-    const nextCount = tapCount + 1;
-    if (nextCount >= 5) {
-      setMode(mode === 'staff' ? 'admin' : 'staff');
-      setTapCount(0);
-    } else {
-      setTapCount(nextCount);
-    }
-  };
-
-  const isDeviceTrusted = (id) => {
-    const trustedData = localStorage.getItem('sjc_trusted_devices');
-    if (!trustedData) return false;
-    try {
-      const entry = JSON.parse(trustedData)[id];
-      return entry && new Date().getTime() < entry.expiresAt;
-    } catch {
-      return false;
-    }
-  };
-
-  const saveTrustedDevice = (id) => {
-    const trustedData = localStorage.getItem('sjc_trusted_devices');
-    let trustedList = {};
-    if (trustedData) {
-      try { trustedList = JSON.parse(trustedData); } catch {}
-    }
-    trustedList[id] = { expiresAt: new Date().getTime() + (30 * 24 * 60 * 60 * 1000) };
-    localStorage.setItem('sjc_trusted_devices', JSON.stringify(trustedList));
-  };
-
-  const completeAuthentication = (userData) => {
-    if (trustDevice) saveTrustedDevice(userData.id);
-
-    if (rememberMe) {
+  // Hidden Multi-Click Admin Bypass (Presentation Mode)
+  const handleLogoTap = () => {
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
+    
+    if (newCount >= 5) {
+      setUsername('admin');
+      setPassword('admin123');
+      const userData = { id: 'admin', role: 'admin', name: 'Supervisor' };
       localStorage.setItem('sjc_active_user', JSON.stringify(userData));
-    } else {
-      sessionStorage.setItem('sjc_active_user', JSON.stringify(userData));
+      setUser(userData);
     }
-
-    setIsExiting(true);
-    setTimeout(() => {
-      onLoginSuccess(userData);
-    }, 300);
   };
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!accountId.trim()) return;
+    setError('');
+    setIsLoading(true);
 
-    const formattedId = accountId.trim();
-    const userData = {
-      id: formattedId,
-      name: mode === 'staff' ? `Custodial Staff #${formattedId}` : 'Supervisor Admin',
-      role: mode,
+    // 1. BULLETPROOF OFFLINE FALLBACK - Check this FIRST to completely prevent connection errors
+    const defaultAccounts = {
+      'admin': 'admin123', '001': '12345678', '002': '12345678',
+      '003': '12345678', '004': '12345678', '005': '12345678'
     };
+    
+    let isValid = false;
+    
+    // Check local hardcoded passwords first. If correct, bypass network check.
+    if (defaultAccounts[username.trim().toLowerCase()] === password) {
+      isValid = true;
+    }
 
-    if (isDeviceTrusted(formattedId)) {
-      completeAuthentication(userData);
+    // 2. Only ping the database if the local password didn't match
+    if (!isValid) {
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('staff_credentials')
+          .select('*')
+          .eq('id', username.trim())
+          .maybeSingle();
+
+        if (!fetchError && data && data.password === password) {
+          isValid = true;
+        }
+      } catch (err) {
+        console.log("Network fetch skipped or failed", err);
+      }
+    }
+
+    // 3. Final Validation
+    if (!isValid) {
+      setError('Invalid Staff ID or Password.');
+      setIsLoading(false);
       return;
     }
 
-    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(randomOtp);
-    setIsSendingEmail(true);
-
-    try {
-      await sendVerificationOTP(formattedId, randomOtp);
-      setShowOtpModal(true);
-    } catch (err) {
-      console.error('Email error, opening modal for testing:', err);
-      setShowOtpModal(true);
-    } finally {
-      setIsSendingEmail(false);
-    }
-  };
-
-  const handleVerifyOtp = (e) => {
-    e.preventDefault();
-    if (inputOtp === generatedOtp || inputOtp === '123456') {
-      const userData = {
-        id: accountId.trim(),
-        name: mode === 'staff' ? `Custodial Staff #${accountId.trim()}` : 'Supervisor Admin',
-        role: mode,
-      };
-      setShowOtpModal(false);
-      completeAuthentication(userData);
-    } else {
-      setOtpError('Invalid verification code.');
-    }
+    const role = username.toLowerCase() === 'admin' ? 'admin' : 'staff';
+    const name = role === 'admin' ? 'Supervisor' : `Staff #${username}`;
+    
+    const userData = { id: username.trim(), role, name };
+    localStorage.setItem('sjc_active_user', JSON.stringify(userData));
+    setUser(userData);
   };
 
   return (
-    <div className={`min-h-screen bg-slate-100 flex items-center justify-center p-4 md:p-8 transition-all duration-500 ${
-      isExiting ? 'translate-y-12 opacity-0' : 'translate-y-0 opacity-100'
-    }`}>
-      
-      {/* PC / Mobile Responsive Card */}
-      <div className="bg-white rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row w-full max-w-4xl overflow-hidden">
+    <div 
+      className="min-h-screen bg-cover bg-center bg-no-repeat flex items-center justify-center p-4 relative"
+      style={{ backgroundImage: `url(${buildingBg})` }}
+    >
+      {/* Removed the blue tint. Using a subtle dark overlay just enough to make white text readable */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      <div className="relative z-10 w-full max-w-6xl flex flex-col lg:flex-row items-center justify-between gap-10">
         
-        {/* Left Side: Branding & Mode Indicator */}
-        <div className="bg-[#176e57] text-white p-10 md:p-16 md:w-1/2 flex flex-col items-center justify-center relative overflow-hidden text-center">
-          <div className="absolute -top-12 -left-12 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-black/10 rounded-full blur-3xl pointer-events-none" />
-
-          {/* Interactive Logo */}
-          <div 
-            onClick={handleLogoClick}
-            className="cursor-pointer inline-flex flex-col items-center select-none active:scale-95 transition-transform relative z-10"
-          >
-            <div className="w-24 h-24 md:w-32 md:h-32 bg-white text-[#176e57] rounded-[2rem] flex items-center justify-center font-black text-5xl md:text-6xl shadow-xl mb-4 border-4 border-emerald-300/30">
-              J
-            </div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-1">JaniTracker</h1>
-            <p className="text-emerald-100/90 text-sm font-medium mb-6">Dimasalang Hall Custodial System</p>
+        {/* LEFT SIDE: ROOMS (Restored) */}
+        <div className="hidden lg:flex flex-col w-1/3 bg-white/10 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/20 text-white shadow-2xl animate-in slide-in-from-left">
+          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+            <Grid className="w-7 h-7 text-emerald-300" />
           </div>
-
-          {/* User Mode Pill - Directly Below Logo */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-full text-sm font-bold bg-black/20 text-emerald-100 border border-white/10 shadow-inner relative z-10 backdrop-blur-sm">
-            {mode === 'admin' ? (
-              <span className="text-amber-300 flex items-center gap-1.5">
-                <Shield className="w-4 h-4 md:w-5 md:h-5" /> Supervisor Admin Mode
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5">
-                <User className="w-4 h-4 md:w-5 md:h-5" /> Custodial Staff Mode
-              </span>
-            )}
-          </div>
+          <h2 className="text-3xl font-black mb-3 drop-shadow-md">Rooms</h2>
+          <p className="text-emerald-50 leading-relaxed font-medium drop-shadow">
+            Real-time tracking of daily sanitation, floor rosters, and instant AC overrides across all active halls.
+          </p>
         </div>
 
-        {/* Right Side: Login Form */}
-        <div className="p-8 md:p-16 md:w-1/2 flex flex-col justify-center bg-white">
-          <h2 className="text-2xl font-black text-slate-800 mb-6 hidden md:block">
-            {mode === 'admin' ? 'Admin Access' : 'Staff Portal'}
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
-                {mode === 'admin' ? 'Admin ID' : 'Staff Account ID'}
-              </label>
-              <div className="relative">
-                <User className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  placeholder={mode === 'admin' ? 'Enter admin key' : 'e.g., 001 or 002'}
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#176e57] transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">Passcode</label>
-              <div className="relative">
-                <Lock className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#176e57] transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <label className="flex items-center gap-3 cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-[#176e57] focus:ring-[#176e57]"
-                />
-                Remember my session
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={trustDevice}
-                  onChange={(e) => setTrustDevice(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-[#176e57] focus:ring-[#176e57]"
-                />
-                Trust this device for 30 days
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSendingEmail}
-              className={`w-full py-4 mt-2 rounded-2xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5 ${
-                mode === 'admin' ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-900/20' : 'bg-[#176e57] hover:bg-[#125744] shadow-emerald-900/20'
-              }`}
+        {/* CENTER: LOGIN CARD */}
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-slate-200/50 p-8 space-y-6">
+          
+          <div className="flex flex-col items-center justify-center text-center space-y-4">
+            {/* 5-Tap Bypass Logo */}
+            <div 
+              onClick={handleLogoTap} 
+              className="w-28 h-28 bg-slate-50 rounded-3xl shadow-lg p-2 cursor-pointer active:scale-95 transition-transform border border-slate-100"
             >
-              {isSendingEmail ? (
-                <><RefreshCw className="w-5 h-5 animate-spin" /> Dispatching Code...</>
-              ) : (
-                <span className="text-base">Sign In to JaniTracker</span>
-              )}
+              <img 
+                src={sjcLogo} 
+                alt="SJC Logo" 
+                className="w-full h-full object-contain rounded-2xl" 
+                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} 
+              />
+              <div style={{ display: 'none' }} className="w-full h-full bg-emerald-50 rounded-2xl items-center justify-center font-black text-2xl text-[#176e57]">SJC</div>
+            </div>
+
+            <div className="space-y-1">
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">PHINMA Saint Jude College</h1>
+              <p className="text-sm font-bold text-[#176e57]">Inventory and Janitory Tracker</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4 pt-2">
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                <ShieldAlert className="w-5 h-5" /> {error}
+              </div>
+            )}
+            
+            <div className="space-y-3">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User className="h-5 w-5 text-slate-400" /></div>
+                <input type="text" required placeholder="Staff ID (e.g., 001 or admin)" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#176e57] transition-all" />
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Lock className="h-5 w-5 text-slate-400" /></div>
+                <input type="password" required placeholder="Security Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#176e57] transition-all" />
+              </div>
+            </div>
+
+            <button type="submit" disabled={isLoading} className="w-full py-4 bg-[#176e57] text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-[#125744] transition-all active:scale-[0.98] shadow-lg shadow-emerald-900/20 mt-2">
+              {isLoading ? <><Loader2 className="w-5 h-5 animate-spin" /> Verifying Access...</> : 'Secure Login'}
             </button>
           </form>
-        </div>
-      </div>
-
-      {/* 2FA Modal */}
-      {showOtpModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-[2rem] max-w-sm w-full p-8 shadow-2xl space-y-6">
-            <div className="text-center space-y-2">
-              <div className="w-16 h-16 bg-emerald-100 text-[#176e57] rounded-full flex items-center justify-center mx-auto mb-4">
-                <KeyRound className="w-8 h-8" />
-              </div>
-              <h3 className="font-black text-slate-800 text-xl">Enter OTP Code</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                Code sent to <br/><span className="font-bold text-slate-700">{getDestinationEmail(accountId)}</span>
-              </p>
-            </div>
-
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <input
-                type="text"
-                maxLength={6}
-                required
-                placeholder="123456"
-                value={inputOtp}
-                onChange={(e) => {
-                  setInputOtp(e.target.value);
-                  setOtpError('');
-                }}
-                className="w-full text-center tracking-[0.5em] font-mono text-2xl py-4 bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#176e57]"
-              />
-
-              {otpError && <p className="text-sm text-red-500 text-center font-bold">{otpError}</p>}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowOtpModal(false)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-[#176e57] text-white rounded-xl font-bold hover:bg-[#125744] transition-colors"
-                >
-                  Verify
-                </button>
-              </div>
-            </form>
+          
+          <div className="text-center pt-2">
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Authorized Personnel Only</p>
           </div>
         </div>
-      )}
+
+        {/* RIGHT SIDE: SUPPLIES (Restored) */}
+        <div className="hidden lg:flex flex-col w-1/3 bg-white/10 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/20 text-white shadow-2xl animate-in slide-in-from-right">
+          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+            <Package className="w-7 h-7 text-amber-300" />
+          </div>
+          <h2 className="text-3xl font-black mb-3 drop-shadow-md">Supplies</h2>
+          <p className="text-emerald-50 leading-relaxed font-medium drop-shadow">
+            Monitor stockroom items, track chemical usage, and maintain equipment availability seamlessly.
+          </p>
+        </div>
+
+      </div>
     </div>
   );
 }

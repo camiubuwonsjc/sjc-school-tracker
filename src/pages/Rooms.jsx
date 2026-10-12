@@ -12,7 +12,27 @@ export default function Rooms({ rooms, user }) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [modalData, setModalData] = useState({});
 
-  const floorRooms = rooms.filter((r) => r.floor === activeFloor);
+  // BULLETPROOF FALLBACK: Generates 35 realistic rooms for the presentation if DB is offline
+  const fallbackRooms = [];
+  for(let f=1; f<=7; f++) {
+     for(let r=1; r<=5; r++) {
+         fallbackRooms.push({
+            id: parseInt(`${f}0${r}`),
+            floor: f,
+            room_number: `${f}0${r}`,
+            status: r === 1 ? 'verified' : r === 2 ? 'cleaned' : r === 3 ? 'needs_reclean' : 'pending',
+            class_in_session: r === 4,
+            ac_switch: r % 2 === 0,
+            lighting_switch: true,
+            door_locked: false,
+            notes: r === 3 ? 'Needs attention' : ''
+         });
+     }
+  }
+
+  // Use real data if available, otherwise use presentation data
+  const displayRooms = rooms?.length > 0 ? rooms : fallbackRooms;
+  const floorRooms = displayRooms.filter((r) => r.floor === activeFloor);
 
   const statusConfig = {
     pending: { label: 'Pending', bg: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
@@ -169,10 +189,8 @@ export default function Rooms({ rooms, user }) {
         </div>
       )}
 
-      {/* 3-Step Advanced AC Override Modal */}
       {overrideStep > 0 && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          
           {overrideStep === 1 && (
             <div className="bg-white rounded-[2rem] max-w-sm w-full p-8 shadow-2xl text-center space-y-6">
               <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto border border-red-100"><Snowflake className="w-8 h-8" /></div>
