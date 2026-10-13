@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loader2, Lock, User, ShieldAlert } from 'lucide-react';
 
-// Explicitly import your local assets for Vite
 import buildingBg from '../assets/building.jpg';
 import sjcLogo from '../assets/logo.png';
 
@@ -13,17 +12,21 @@ export default function Login({ setUser }) {
   const [isLoading, setIsLoading] = useState(false);
   const [tapCount, setTapCount] = useState(0);
 
+  // Instant login helper to prevent any stuck loading states
+  const completeLogin = (id, role, name) => {
+    const userData = { id, role, name };
+    localStorage.setItem('sjc_active_user', JSON.stringify(userData));
+    sessionStorage.setItem('sjc_active_user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
   // Hidden Multi-Click Admin Bypass (Presentation Mode)
   const handleLogoTap = () => {
     const newCount = tapCount + 1;
     setTapCount(newCount);
     
     if (newCount >= 5) {
-      setUsername('admin');
-      setPassword('admin123');
-      const userData = { id: 'admin', role: 'admin', name: 'Supervisor' };
-      localStorage.setItem('sjc_active_user', JSON.stringify(userData));
-      setUser(userData);
+      completeLogin('admin', 'admin', 'Supervisor');
     }
   };
 
@@ -32,16 +35,20 @@ export default function Login({ setUser }) {
     setError('');
     setIsLoading(true);
 
+    const cleanUsername = username.trim().toLowerCase();
     const defaultAccounts = {
       'admin': 'admin123', '001': '12345678', '002': '12345678',
       '003': '12345678', '004': '12345678', '005': '12345678'
     };
     
     let isValid = false;
-    if (defaultAccounts[username.trim().toLowerCase()] === password) {
+    
+    // Check hardcoded backup passwords first for instant offline reliability
+    if (defaultAccounts[cleanUsername] === password) {
       isValid = true;
     }
 
+    // Check database if local match fails
     if (!isValid) {
       try {
         const { data, error: fetchError } = await supabase
@@ -54,7 +61,7 @@ export default function Login({ setUser }) {
           isValid = true;
         }
       } catch (err) {
-        console.log("Network fetch skipped or failed", err);
+        console.log("Database offline, falling back to local verification", err);
       }
     }
 
@@ -64,12 +71,11 @@ export default function Login({ setUser }) {
       return;
     }
 
-    const role = username.toLowerCase() === 'admin' ? 'admin' : 'staff';
-    const name = role === 'admin' ? 'Supervisor' : `Staff #${username}`;
+    const role = cleanUsername === 'admin' ? 'admin' : 'staff';
+    const name = role === 'admin' ? 'Supervisor' : `Staff #${username.trim()}`;
     
-    const userData = { id: username.trim(), role, name };
-    localStorage.setItem('sjc_active_user', JSON.stringify(userData));
-    setUser(userData);
+    setIsLoading(false);
+    completeLogin(username.trim(), role, name);
   };
 
   return (
@@ -79,7 +85,7 @@ export default function Login({ setUser }) {
     >
       <div className="absolute inset-0 bg-black/40" />
 
-      {/* Main Container - Less than half screen width (max-w-4xl) */}
+      {/* Main Container - Split Layout (Form Left, Logo Right) */}
       <div className="relative z-10 w-full max-w-4xl bg-white/95 backdrop-blur-xl rounded-[3rem] shadow-2xl border border-white/40 p-8 md:p-12 overflow-hidden">
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
@@ -143,4 +149,4 @@ export default function Login({ setUser }) {
       </div>
     </div>
   );
-}git add .
+}
