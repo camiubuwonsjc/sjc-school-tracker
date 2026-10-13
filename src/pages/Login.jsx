@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loader2, Lock, User, ShieldAlert } from 'lucide-react';
 
+import buildingBg from '../assets/building.jpg';
+import sjcLogo from '/logo.png';
+
 export default function Login({ setUser }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -78,7 +81,7 @@ export default function Login({ setUser }) {
   return (
     <div 
       className="min-h-screen bg-cover bg-center bg-no-repeat flex items-center justify-center p-4 relative"
-      style={{ backgroundImage: "url('/building.jpg')" }}
+      style={{ backgroundImage: `url(${buildingBg})` }}
     >
       <div className="absolute inset-0 bg-black/40" />
 
@@ -130,7 +133,7 @@ export default function Login({ setUser }) {
               className="w-32 h-32 bg-white rounded-3xl shadow-md p-2 cursor-pointer active:scale-95 transition-transform border border-slate-100 flex items-center justify-center mb-4"
             >
               <img 
-                src="/logo.png" 
+                src={sjcLogo} 
                 alt="SJC Logo" 
                 className="w-full h-full object-contain rounded-2xl" 
                 onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} 
