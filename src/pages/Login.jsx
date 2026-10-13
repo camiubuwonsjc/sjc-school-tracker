@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Loader2, Lock, User, ShieldAlert } from 'lucide-react';
 
 import buildingBg from '../assets/building.jpg';
-import sjcLogo from '../assets/logo.png';
+import sjcLogo from '/logo.png';
 
 export default function Login({ setUser }) {
   const [username, setUsername] = useState('');
