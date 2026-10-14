@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { supabase } from '../data/supabaseClient';
-import { api } from '../services/api';
-import BlastACModal from '../components/BlastACModal';
+import { supabase } from '../lib/supabase';
 import { 
   Building2, 
   CheckCircle2, 
@@ -13,7 +11,6 @@ import {
   Users, 
   X, 
   Check, 
-  Snowflake,
   Search
 } from 'lucide-react';
 
@@ -24,7 +21,6 @@ export default function Rooms({ rooms = [], setRooms, user, assignments = {} }) 
   const [activeModalRoom, setActiveModalRoom] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [showBlastModal, setShowBlastModal] = useState(false);
 
   // Form states for the room modal
   const [statusVal, setStatusVal] = useState('pending');
@@ -110,21 +106,17 @@ export default function Rooms({ rooms = [], setRooms, user, assignments = {} }) 
     }
 
     try {
-      // Routed through Node.js & Express MVC Backend API
-      await api.updateRoom(activeModalRoom.id, updatedData);
-      setToastMessage(`Room ${activeModalRoom.id} inspection recorded via Express API!`);
+      // Direct Supabase update
+      const { error } = await supabase.from('rooms').update(updatedData).eq('id', activeModalRoom.id);
+      if (error) throw error;
+      
+      setToastMessage(`Room ${activeModalRoom.id} inspection recorded!`);
       setTimeout(() => setToastMessage(''), 3000);
       handleCloseRoomModal();
     } catch (err) {
-      console.warn('Express API unavailable, attempting client fallback:', err);
-      try {
-        await supabase.from('rooms').update(updatedData).eq('id', activeModalRoom.id);
-        setToastMessage(`Room ${activeModalRoom.id} inspection recorded (offline mode)!`);
-        setTimeout(() => setToastMessage(''), 3000);
-        handleCloseRoomModal();
-      } catch (fallbackErr) {
-        console.error('All update paths failed:', fallbackErr);
-      }
+      console.error('Update failed:', err);
+      setToastMessage('Failed to save inspection.');
+      setTimeout(() => setToastMessage(''), 3000);
     } finally {
       setIsSaving(false);
     }
@@ -173,16 +165,6 @@ export default function Rooms({ rooms = [], setRooms, user, assignments = {} }) 
             35 Classrooms across 7 Floors
           </p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setShowBlastModal(true)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-50 hover:bg-cyan-100 active:scale-95 text-cyan-800 rounded-xl text-xs font-bold transition border border-cyan-200/80 shadow-xs"
-          title="Campus Remote AC Override"
-        >
-          <Snowflake className="w-3.5 h-3.5 text-cyan-600" />
-          <span>Blast AC</span>
-        </button>
       </div>
 
       {/* Search Input Bar */}
@@ -520,12 +502,6 @@ export default function Rooms({ rooms = [], setRooms, user, assignments = {} }) 
         </div>,
         document.body
       )}
-
-      {/* Blast AC Modal Integration */}
-      <BlastACModal
-        isOpen={showBlastModal}
-        onClose={() => setShowBlastModal(false)}
-      />
     </div>
   );
 }
