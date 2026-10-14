@@ -1,150 +1,83 @@
-import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { Loader2, Lock, User, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, Mail, ChevronRight } from 'lucide-react';
 
-import buildingBg from '../assets/building.jpg';
-import sjcLogo from '/logo.png';
-
-export default function Login({ setUser }) {
-  const [username, setUsername] = useState('');
+export default function Login() {
+  const [isMounted, setIsMounted] = useState(false);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [tapCount, setTapCount] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Instant login helper to prevent any stuck loading states
-  const completeLogin = (id, role, name) => {
-    const userData = { id, role, name };
-    localStorage.setItem('sjc_active_user', JSON.stringify(userData));
-    sessionStorage.setItem('sjc_active_user', JSON.stringify(userData));
-    setUser(userData);
-  };
+  // Triggers the poppy animation instantly upon load
+  useEffect(() => {
+    const timer = setTimeout(() => setIsMounted(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
-  // Hidden Multi-Click Admin Bypass (Presentation Mode)
-  const handleLogoTap = () => {
-    const newCount = tapCount + 1;
-    setTapCount(newCount);
-    
-    if (newCount >= 5) {
-      completeLogin('admin', 'admin', 'Supervisor');
-    }
-  };
-
-  const handleLogin = async (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    const cleanUsername = username.trim().toLowerCase();
-    const defaultAccounts = {
-      'admin': 'admin123', '001': '12345678', '002': '12345678',
-      '003': '12345678', '004': '12345678', '005': '12345678'
-    };
-    
-    let isValid = false;
-    
-    // Check hardcoded backup passwords first for instant offline reliability
-    if (defaultAccounts[cleanUsername] === password) {
-      isValid = true;
-    }
-
-    // Check database if local match fails
-    if (!isValid) {
-      try {
-        const { data, error: fetchError } = await supabase
-          .from('staff_credentials')
-          .select('*')
-          .eq('id', username.trim())
-          .maybeSingle();
-
-        if (!fetchError && data && data.password === password) {
-          isValid = true;
-        }
-      } catch (err) {
-        console.log("Database offline, falling back to local verification", err);
-      }
-    }
-
-    if (!isValid) {
-      setError('Invalid Staff ID or Password.');
-      setIsLoading(false);
-      return;
-    }
-
-    const role = cleanUsername === 'admin' ? 'admin' : 'staff';
-    const name = role === 'admin' ? 'Supervisor' : `Staff #${username.trim()}`;
-    
-    setIsLoading(false);
-    completeLogin(username.trim(), role, name);
+    setIsSubmitting(true);
+    // Add your actual login logic here
+    setTimeout(() => setIsSubmitting(false), 1000); 
   };
 
   return (
-    <div 
-      className="min-h-screen bg-cover bg-center bg-no-repeat flex items-center justify-center p-4 relative"
-      style={{ backgroundImage: `url(${buildingBg})` }}
-    >
-      <div className="absolute inset-0 bg-black/40" />
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      {/* Animated Wrapper Container */}
+      <div 
+        className="transition-all duration-700 overflow-hidden origin-left flex flex-col justify-center"
+        style={{ 
+          width: isMounted ? '100%' : '1%', 
+          opacity: isMounted ? 1 : 0,
+          maxWidth: '400px', // Ensures the maximum width remains standard for a login box
+          transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' 
+        }}
+      >
+        <div className="bg-white p-8 rounded-3xl shadow-xl w-full border border-slate-100">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-extrabold text-slate-900 mb-2">Welcome Back</h1>
+            <p className="text-sm text-slate-500">Sign in to the SJC Facilities Portal</p>
+          </div>
 
-      {/* Main Container - Split Layout (Form Left, Logo Right) */}
-      <div className="relative z-10 w-full max-w-4xl bg-white/95 backdrop-blur-xl rounded-[3rem] shadow-2xl border border-white/40 p-8 md:p-12 overflow-hidden">
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-          
-          {/* LEFT SIDE: Username, Password & Form */}
-          <div className="space-y-6">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">PHINMA Saint Jude College</h1>
-              <p className="text-xs font-bold text-[#176e57] uppercase tracking-wider">Inventory & Janitorial Tracker</p>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-4">
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-xs font-bold flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 shrink-0" /> {error}
-                </div>
-              )}
-              
-              <div className="space-y-3">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User className="h-4 w-4 text-slate-400" /></div>
-                  <input type="text" required placeholder="Staff ID (e.g., 001 or admin)" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#176e57]" />
-                </div>
-
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Lock className="h-4 w-4 text-slate-400" /></div>
-                  <input type="password" required placeholder="Security Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#176e57]" />
-                </div>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-800 focus:outline-none focus:border-[#176e57] focus:ring-1 focus:ring-[#176e57] transition"
+                  placeholder="admin@sjc.edu.ph"
+                />
               </div>
-
-              <button type="submit" disabled={isLoading} className="w-full py-3.5 bg-[#176e57] text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-[#125744] transition-all shadow-lg shadow-emerald-900/20 text-sm">
-                {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : 'Secure Login'}
-              </button>
-            </form>
-            
-            <div className="text-left">
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Authorized Personnel Only</p>
             </div>
-          </div>
 
-          {/* RIGHT SIDE: Logo in the Middle (5-Tap Bypass) */}
-          <div className="flex flex-col items-center justify-center text-center p-6 bg-slate-50/80 rounded-[2.5rem] border border-slate-200/60 shadow-inner">
-            <div 
-              onClick={handleLogoTap} 
-              className="w-32 h-32 bg-white rounded-3xl shadow-md p-2 cursor-pointer active:scale-95 transition-transform border border-slate-100 flex items-center justify-center mb-4"
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Password</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-800 focus:outline-none focus:border-[#176e57] focus:ring-1 focus:ring-[#176e57] transition"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3.5 bg-[#176e57] hover:bg-[#135c49] active:scale-95 text-white font-bold rounded-2xl text-sm transition shadow-md flex items-center justify-center gap-2 mt-4"
             >
-              <img 
-                src={sjcLogo} 
-                alt="SJC Logo" 
-                className="w-full h-full object-contain rounded-2xl" 
-                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} 
-              />
-              <div style={{ display: 'none' }} className="w-full h-full bg-emerald-50 rounded-2xl items-center justify-center font-black text-2xl text-[#176e57]">SJC</div>
-            </div>
-            
-            <h3 className="font-black text-slate-700 text-sm">Dimasalang Campus</h3>
-            <p className="text-[11px] text-slate-400 font-medium mt-1">Tap logo 5x for instant supervisor access</p>
-          </div>
-
+              <span>{isSubmitting ? 'Signing in...' : 'Sign In'}</span>
+              {!isSubmitting && <ChevronRight className="w-4 h-4" />}
+            </button>
+          </form>
         </div>
       </div>
     </div>
