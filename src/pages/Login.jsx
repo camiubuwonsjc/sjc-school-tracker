@@ -47,11 +47,9 @@ export default function Login({ onLoginSuccess }) {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // TODO: Replace with your actual Supabase authentication logic
     setTimeout(() => {
       setIsSubmitting(false);
       
-      // Mock user object returning to App.jsx
       const mockUser = isAdminMode 
         ? { id: 'admin', name: 'Supervisor', role: 'admin' }
         : { id: accountId, name: staffList.find(s => s.id === accountId)?.name || 'Staff', role: 'staff' };
@@ -71,8 +69,7 @@ export default function Login({ onLoginSuccess }) {
         backgroundPosition: 'center',
       }}
     >
-      {/* SJC Green Overlay for contrast */}
-      <div className="absolute inset-0 bg-[#176e57]/85 backdrop-blur-[2px] z-0" />
+      {/* Green overlay has been removed completely! Only the background pic is visible. */}
 
       {/* Animated Wrapper Container */}
       <div 
@@ -84,13 +81,13 @@ export default function Login({ onLoginSuccess }) {
           transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' 
         }}
       >
-        <div className="bg-white p-8 rounded-[2rem] shadow-2xl w-full border border-white/20">
+        <div className="bg-white/95 backdrop-blur-md p-8 rounded-[2rem] shadow-2xl w-full border border-white/40">
           
           <div className="text-center mb-8 flex flex-col items-center">
             {/* Logo with 5-click secret admin trigger */}
             <div 
               onClick={handleLogoClick}
-              className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-sm p-2 mb-4 cursor-pointer active:scale-95 transition-transform"
+              className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-md p-2 mb-4 cursor-pointer active:scale-95 transition-transform"
               title={!isAdminMode ? "Click 5 times for Admin Access" : ""}
             >
               <img src={logoImg} alt="SJC Logo" className="w-full h-full object-contain" />
@@ -105,7 +102,6 @@ export default function Login({ onLoginSuccess }) {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
-            {/* Conditional input: Staff Dropdown vs Admin Email */}
             {isAdminMode ? (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-bottom-2">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Admin Email</label>
@@ -116,7 +112,7 @@ export default function Login({ onLoginSuccess }) {
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
                     required
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition"
                     placeholder="admin@sjc.edu.ph"
                   />
                 </div>
@@ -130,7 +126,7 @@ export default function Login({ onLoginSuccess }) {
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
                     required
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-[#176e57] focus:ring-2 focus:ring-[#176e57]/20 transition appearance-none cursor-pointer"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-[#176e57] focus:ring-2 focus:ring-[#176e57]/20 transition appearance-none cursor-pointer"
                   >
                     {staffList.map((staff) => (
                       <option key={staff.id} value={staff.id}>
@@ -151,7 +147,7 @@ export default function Login({ onLoginSuccess }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className={`w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 transition ${isAdminMode ? 'focus:border-amber-500 focus:ring-amber-500/20' : 'focus:border-[#176e57] focus:ring-[#176e57]/20'}`}
+                  className={`w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 transition ${isAdminMode ? 'focus:border-amber-500 focus:ring-amber-500/20' : 'focus:border-[#176e57] focus:ring-[#176e57]/20'}`}
                   placeholder="••••••••"
                 />
               </div>

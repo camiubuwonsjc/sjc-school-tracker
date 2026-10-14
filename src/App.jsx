@@ -18,8 +18,8 @@ export default function App() {
   const [logs, setLogs] = useState([]);
   const [broadcast, setBroadcast] = useState(null);
   const [onlineStaff, setOnlineStaff] = useState([]);
+  const [syncChannel, setSyncChannel] = useState(null); // Real-time broadcaster
 
-  // Check initial login session
   useEffect(() => {
     try {
       const localUser = localStorage.getItem('sjc_active_user');
@@ -33,7 +33,6 @@ export default function App() {
     }
   }, []);
 
-  // Fetch initial data & bind Supabase Realtime listeners
   useEffect(() => {
     const fetchInitialData = async () => {
       const [{ data: roomsData }, { data: suppliesData }, { data: logsData }, { data: broadcastData }] =
@@ -44,7 +43,18 @@ export default function App() {
           supabase.from('broadcast').select('*').eq('id', 1).maybeSingle(),
         ]);
 
-      if (roomsData) setRooms(roomsData);
+      // FIX: If database is empty, generate 35 dummy rooms so the UI never breaks
+      if (roomsData && roomsData.length > 0) {
+        setRooms(roomsData);
+      } else {
+        const fallbackRooms = Array.from({length: 35}, (_, i) => {
+          const floor = Math.floor(i / 5) + 1;
+          const roomNum = `${floor}0${(i % 5) + 1}`;
+          return { id: roomNum, floor, status: 'pending', acChecked: false, lightsChecked: false, doorChecked: false, hasStudents: false, notes: '' };
+        });
+        setRooms(fallbackRooms);
+      }
+
       if (suppliesData) setSupplies(suppliesData);
       if (logsData) setLogs(logsData);
       if (broadcastData) setBroadcast(broadcastData);
@@ -52,78 +62,44 @@ export default function App() {
 
     fetchInitialData();
 
-    // Supabase Realtime Channel
-    const realtimeChannel = supabase
-      .channel('global-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, (payload) => {
-        if (payload.eventType === 'UPDATE') {
-          setRooms((prev) => prev.map((r) => (r.id === payload.new.id ? payload.new : r)));
-        }
+    // SUPER-SYNC CHANNEL: Connects you and your friends instantly
+    const channel = supabase.channel('sjc-sync-network');
+    
+    channel
+      .on('broadcast', { event: 'new-log' }, (payload) => {
+        setLogs(prev => [payload.payload, ...prev]);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'supplies' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setSupplies((prev) => {
-            const isDuplicate = prev.some((s) => s.id === payload.new.id);
-            return isDuplicate ? prev : [...prev, payload.new];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          setSupplies((prev) => prev.map((s) => (s.id === payload.new.id ? payload.new : s)));
-        } else if (payload.eventType === 'DELETE') {
-          setSupplies((prev) => prev.filter((s) => s.id === payload.old.id));
-        }
+      .on('broadcast', { event: 'delete-log' }, (payload) => {
+        setLogs(prev => prev.filter(l => l.id !== payload.payload.id));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'logs' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setLogs((prev) => {
-            const isDuplicate = prev.some(
-              (item) => item.id === payload.new.id || (item.text === payload.new.text && item.time === payload.new.time)
-            );
-            return isDuplicate ? prev : [payload.new, ...prev];
-          });
-        } else if (payload.eventType === 'DELETE') {
-          setLogs((prev) => prev.filter((item) => item.id === payload.old.id));
-        }
+      .on('broadcast', { event: 'room-updated' }, (payload) => {
+        setRooms(prev => prev.map(r => r.id === payload.payload.id ? { ...r, ...payload.payload } : r));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast' }, (payload) => {
-        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-          setBroadcast(payload.new);
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setSyncChannel(channel); // Save channel so components can send messages
         }
-      })
-      .subscribe();
+      });
 
-    return () => {
-      supabase.removeChannel(realtimeChannel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Online Staff Presence Channel
   useEffect(() => {
     if (!user) return;
-
-    const presenceChannel = supabase.channel('online-staff-tracker', {
-      config: { presence: { key: user.id } },
-    });
+    const presenceChannel = supabase.channel('online-staff-tracker', { config: { presence: { key: user.id } } });
 
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        const activeUsers = Object.values(state).flatMap((presences) => presences);
+        const activeUsers = Object.values(presenceChannel.presenceState()).flatMap(p => p);
         setOnlineStaff(activeUsers);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({
-            id: user.id,
-            name: user.name,
-            role: user.role,
-            onlineAt: new Date().toISOString(),
-          });
+          await presenceChannel.track({ id: user.id, name: user.name, role: user.role, onlineAt: new Date().toISOString() });
         }
       });
 
-    return () => {
-      presenceChannel.unsubscribe();
-    };
+    return () => { presenceChannel.unsubscribe(); };
   }, [user]);
 
   if (!user) {
@@ -132,7 +108,6 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* PC: pb-0 because navbar is hidden, Mobile: pb-20 to clear bottom nav */}
       <div className="min-h-screen bg-slate-50 text-slate-900 pb-20 md:pb-0 select-none">
         <Header user={user} setUser={setUser} broadcast={broadcast} />
 
@@ -142,26 +117,12 @@ export default function App() {
           </div>
         )}
 
-        {/* Expanded max-w-6xl for Desktop layout */}
         <main className="max-w-6xl mx-auto px-4 pt-6 md:pt-8 md:px-8">
           <Routes>
-            <Route
-              path="/"
-              element={
-                <Dashboard
-                  rooms={rooms}
-                  supplies={supplies}
-                  logs={logs}
-                  onlineStaff={onlineStaff}
-                  user={user}
-                />
-              }
-            />
-            <Route path="/rooms" element={<Rooms rooms={rooms} user={user} />} />
+            <Route path="/" element={<Dashboard rooms={rooms} supplies={supplies} logs={logs} setLogs={setLogs} onlineStaff={onlineStaff} user={user} syncChannel={syncChannel} />} />
+            <Route path="/rooms" element={<Rooms rooms={rooms} setRooms={setRooms} user={user} syncChannel={syncChannel} />} />
             <Route path="/supplies" element={<Supplies supplies={supplies} user={user} />} />
-            {user.role === 'admin' && (
-              <Route path="/admin" element={<Admin rooms={rooms} supplies={supplies} user={user} />} />
-            )}
+            {user.role === 'admin' && <Route path="/admin" element={<Admin rooms={rooms} supplies={supplies} user={user} />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

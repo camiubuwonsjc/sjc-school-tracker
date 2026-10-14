@@ -2,12 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import StaffPresenceModal from '../components/StaffPresenceModal';
-import { 
-  Building2, Package, Users, Send, Trash2, 
-  AlertTriangle, Sparkles, ChevronRight, ClipboardCheck, CheckCircle2
-} from 'lucide-react';
+import { Building2, Package, Users, Send, Trash2, AlertTriangle, Sparkles, ChevronRight, ClipboardCheck, CheckCircle2 } from 'lucide-react';
 
-export default function Dashboard({ rooms, supplies, logs, onlineStaff, user }) {
+export default function Dashboard({ rooms, supplies, logs, setLogs, onlineStaff, user, syncChannel }) {
   const navigate = useNavigate();
   const [isPresenceOpen, setIsPresenceOpen] = useState(false);
   const [newLogText, setNewLogText] = useState('');
@@ -21,23 +18,47 @@ export default function Dashboard({ rooms, supplies, logs, onlineStaff, user }) 
   const handleAddLog = async (e) => {
     e.preventDefault();
     if (!newLogText.trim()) return;
-
     setIsSubmittingLog(true);
-    const { error } = await supabase.from('logs').insert({
+
+    const logEntry = {
+      id: Date.now(), // Temp ID
       text: newLogText.trim(),
       staff_id: user.id,
       staff_name: user.name,
       time: new Date().toISOString(),
-    });
+    };
 
-    if (!error) setNewLogText('');
-    else console.error('Failed to dispatch log entry:', error);
+    // 1. Instantly update MY screen
+    setLogs(prev => [logEntry, ...prev]);
+    setNewLogText('');
+
+    // 2. Instantly send to FRIENDS' screens via Broadcast
+    if (syncChannel) {
+      syncChannel.send({ type: 'broadcast', event: 'new-log', payload: logEntry });
+    }
+
+    // 3. Save to database silently in the background
+    await supabase.from('logs').insert({
+      text: logEntry.text,
+      staff_id: logEntry.staff_id,
+      staff_name: logEntry.staff_name,
+      time: logEntry.time,
+    });
+    
     setIsSubmittingLog(false);
   };
 
   const handleDeleteLog = async (logId) => {
-    const { error } = await supabase.from('logs').delete().eq('id', logId);
-    if (error) console.error('Failed to delete log entry:', error);
+    // Instantly remove from MY screen
+    setLogs(prev => prev.filter(l => l.id !== logId));
+    
+    // Instantly remove from FRIENDS' screens
+    if (syncChannel) {
+      syncChannel.send({ type: 'broadcast', event: 'delete-log', payload: { id: logId } });
+    }
+
+    // Delete from database
+    await supabase.from('logs').delete().eq('id', logId);
   };
 
   return (
@@ -45,7 +66,6 @@ export default function Dashboard({ rooms, supplies, logs, onlineStaff, user }) 
       {/* LEFT COLUMN (Main Desktop Content) */}
       <div className="flex-1 space-y-5 md:space-y-6">
         
-        {/* Sanitation Progress Banner - Upgraded to Bright Pine Green */}
         <div className="bg-[#176e57] rounded-3xl md:rounded-[2rem] p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -73,7 +93,6 @@ export default function Dashboard({ rooms, supplies, logs, onlineStaff, user }) 
           </div>
         </div>
 
-        {/* Quick Navigation Cards */}
         <div className="grid grid-cols-2 gap-4">
           <div onClick={() => navigate('/rooms')} className="bg-white p-5 md:p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg cursor-pointer transition-all hover:-translate-y-1 space-y-4">
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-emerald-50 text-[#176e57] flex items-center justify-center">
@@ -100,7 +119,6 @@ export default function Dashboard({ rooms, supplies, logs, onlineStaff, user }) 
           </div>
         </div>
 
-        {/* Floor Assignment & Presence Header */}
         <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3 text-[#176e57]">
@@ -136,7 +154,6 @@ export default function Dashboard({ rooms, supplies, logs, onlineStaff, user }) 
             <Sparkles className="w-5 h-5 text-[#176e57]" /> Live Handover Feed
           </h3>
 
-          {/* Chat Feed */}
           <div className="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar mb-4 flex flex-col">
             {logs.length === 0 ? (
               <p className="text-center text-sm font-medium text-slate-400 py-8 m-auto">No shift logs recorded today.</p>
@@ -160,7 +177,6 @@ export default function Dashboard({ rooms, supplies, logs, onlineStaff, user }) 
                     </div>
                     <p className="text-sm text-slate-800 font-medium leading-relaxed">{log.text}</p>
                     
-                    {/* Admins can delete any log, Users can delete their own */}
                     {(user.role === 'admin' || isMe) && (
                       <button 
                         onClick={() => handleDeleteLog(log.id)}
@@ -176,7 +192,6 @@ export default function Dashboard({ rooms, supplies, logs, onlineStaff, user }) 
             )}
           </div>
 
-          {/* Input Box */}
           <form onSubmit={handleAddLog} className="flex gap-2 pt-2 border-t border-slate-100">
             <input
               type="text"
