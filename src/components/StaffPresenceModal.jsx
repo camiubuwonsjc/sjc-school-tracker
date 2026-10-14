@@ -4,7 +4,6 @@ import { X, Users, CheckCircle2, Circle } from 'lucide-react';
 export default function StaffPresenceModal({ isOpen, onClose, onlineStaff }) {
   if (!isOpen) return null;
 
-  // Default custodial roster mapping for Saint Jude College (Floors 1–7)
   const roster = [
     { id: '001', name: 'Custodial Staff #001', defaultFloor: 'Floors 1 & 2' },
     { id: '002', name: 'Custodial Staff #002', defaultFloor: 'Floors 3 & 4' },
@@ -14,13 +13,12 @@ export default function StaffPresenceModal({ isOpen, onClose, onlineStaff }) {
   ];
 
   const isStaffOnline = (staffId) => {
-    return onlineStaff.some((member) => member.id === staffId);
+    return onlineStaff?.some((member) => member.id === staffId);
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-        {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2 text-[#176e57]">
             <Users className="w-5 h-5" />
@@ -34,7 +32,6 @@ export default function StaffPresenceModal({ isOpen, onClose, onlineStaff }) {
           </button>
         </div>
 
-        {/* Staff Roster List */}
         <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
           {roster.map((staff) => {
             const online = isStaffOnline(staff.id);

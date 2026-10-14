@@ -5,15 +5,10 @@ import { Package, Search, Plus, Minus, Trash2, AlertTriangle, Download, X, Check
 export default function Supplies({ supplies, user }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  
-  // Optimistic UI State (Ensures instant visual updates during presentations)
   const [localSupplies, setLocalSupplies] = useState([]);
-
-  // Deduction Modal State
   const [deductModal, setDeductModal] = useState(null);
   const [useAmount, setUseAmount] = useState('');
 
-  // BULLETPROOF FALLBACK
   const fallbackSupplies = [
     { id: 1, name: 'Industrial Bleach', category: 'Chemicals', count: 15, threshold: 20, unit: 'Gallons' },
     { id: 2, name: 'Heavy Duty Mop', category: 'Equipment', count: 3, threshold: 5, unit: 'Pieces' },
@@ -35,14 +30,12 @@ export default function Supplies({ supplies, user }) {
     return matchesCategory && matchesSearch;
   });
 
-  // INSTANT OPTIMISTIC UPDATE: Add 1 (Admin Only)
   const handleAdminAdd = (item) => {
     const newCount = item.count + 1;
     setLocalSupplies(prev => prev.map(s => s.id === item.id ? { ...s, count: newCount } : s));
     supabase.from('supplies').update({ count: newCount, updated_at: new Date().toISOString() }).eq('id', item.id);
   };
 
-  // INSTANT OPTIMISTIC UPDATE: Deduct custom amount (Admin & Staff)
   const confirmDeduction = (e) => {
     e.preventDefault();
     const amountToDeduct = parseInt(useAmount);
@@ -50,10 +43,7 @@ export default function Supplies({ supplies, user }) {
 
     const newCount = Math.max(0, deductModal.count - amountToDeduct);
     
-    // Update screen instantly
     setLocalSupplies(prev => prev.map(s => s.id === deductModal.id ? { ...s, count: newCount } : s));
-    
-    // Update DB in background
     supabase.from('supplies').update({ count: newCount, updated_at: new Date().toISOString() }).eq('id', deductModal.id);
     
     setDeductModal(null);
@@ -82,7 +72,7 @@ export default function Supplies({ supplies, user }) {
   };
 
   return (
-    <div className="space-y-5 pb-8 relative">
+    <div className="space-y-5 p-4 sm:p-6 pb-24 md:pb-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-5 md:p-6 rounded-3xl border border-slate-200/80 shadow-sm gap-4">
         <div>
           <h2 className="text-xl font-black text-slate-800">Stockroom Items</h2>
@@ -134,18 +124,13 @@ export default function Supplies({ supplies, user }) {
                 </div>
 
                 <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
-                  
-                  {/* REDUCED ACCESS: Staff/Janitors can only see and click the minus button */}
                   <button disabled={item.count === 0} onClick={() => { setDeductModal(item); setUseAmount(''); }} className="w-10 h-10 rounded-xl bg-white text-slate-700 hover:bg-slate-200 flex items-center justify-center shadow-sm active:scale-95 transition-all disabled:opacity-40 border border-slate-200">
                     <Minus className="w-4 h-4" />
                   </button>
-                  
                   <div className="px-3 text-center min-w-[50px]">
                     <span className={`font-black text-lg ${isLowStock ? 'text-amber-600' : 'text-slate-800'}`}>{item.count}</span>
                     <span className="text-[10px] font-bold text-slate-400 block -mt-1 uppercase">{item.unit}</span>
                   </div>
-                  
-                  {/* FULL ACCESS: Admins get the Plus button */}
                   {user?.role === 'admin' && (
                     <button onClick={() => handleAdminAdd(item)} className="w-10 h-10 rounded-xl bg-[#176e57] text-white hover:bg-[#125744] flex items-center justify-center shadow-sm active:scale-95 transition-all">
                       <Plus className="w-4 h-4" />
@@ -158,7 +143,6 @@ export default function Supplies({ supplies, user }) {
         })}
       </div>
 
-      {/* Deduction Prompt Modal */}
       {deductModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-[2rem] max-w-sm w-full shadow-2xl overflow-hidden transform transition-all animate-in zoom-in-95">

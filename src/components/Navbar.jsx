@@ -7,7 +7,7 @@ export default function Navbar({ role }) {
   const navigate = useNavigate();
 
   const tabs = [
-    { id: 'home', label: 'Home', path: '/', icon: Home },
+    { id: 'home', label: 'Home', path: '/dashboard', icon: Home },
     { id: 'rooms', label: 'Rooms', path: '/rooms', icon: Grid },
     { id: 'supplies', label: 'Supplies', path: '/supplies', icon: Package },
   ];
