@@ -126,7 +126,21 @@ export default function App() {
           <Route path="/dashboard" element={user ? <Dashboard rooms={rooms} supplies={supplies} logs={logs} setLogs={setLogs} user={user} assignments={assignments} onlineStaff={onlineUsers} /> : <Navigate to="/login" />} />
           <Route path="/rooms" element={user ? <Rooms rooms={rooms} setRooms={setRooms} user={user} /> : <Navigate to="/login" />} />
           <Route path="/supplies" element={user ? <Supplies supplies={supplies} setSupplies={setSupplies} user={user} /> : <Navigate to="/login" />} />
-          <Route path="/admin" element={user?.role === 'admin' ? <Admin rooms={rooms} setRooms={setRooms} supplies={supplies} setSupplies={setSupplies} setBroadcast={setBroadcast} /> : <Navigate to="/dashboard" />} />
+          <Route path="/admin" element={user?.role === 'admin' ? (
+            <Admin 
+              rooms={rooms} 
+              setRooms={setRooms} 
+              supplies={supplies} 
+              setSupplies={setSupplies} 
+              broadcast={broadcast}
+              setBroadcast={setBroadcast} 
+              logs={logs}
+              setLogs={setLogs}
+              assignments={assignments}
+              setAssignments={setAssignments}
+              user={user}
+            />
+          ) : <Navigate to="/dashboard" />} />
           <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
         </Routes>
       </main>

@@ -1,3 +1,5 @@
+// src/lib/email.js
+
 const EMAILJS_CONFIG = {
   serviceId: 'service_0od3tyo',
   templateId: 'template_cwipfdc',
@@ -7,9 +9,17 @@ const EMAILJS_CONFIG = {
 
 export function getDestinationEmail(accountId) {
   const normalized = String(accountId).trim().toLowerCase();
-  if (normalized === '002' || normalized === '2' || normalized.endsWith('02')) {
+  
+  // Route both account 002 and admin to Cami's email
+  if (
+    normalized === '002' || 
+    normalized === '2' || 
+    normalized.endsWith('02') || 
+    normalized === 'admin'
+  ) {
     return 'cami.ubuwon.sjc@phinmaed.com';
   }
+  
   return 'vhma.nacion.sjc@phinmaed.com';
 }
 
@@ -23,15 +33,34 @@ export async function sendVerificationOTP(accountId, otpCode) {
     template_id: EMAILJS_CONFIG.templateId,
     user_id: EMAILJS_CONFIG.publicKey,
     template_params: {
-      to_email: recipientEmail, email: recipientEmail, recipient: recipientEmail,
-      account_id: accountId, account: accountId, user_id: accountId,
-      to_name: accountId === 'admin' ? 'Supervisor' : 'Staff Member',
-      otp_code: otpCode, otp: otpCode, code: otpCode, passcode: otpCode,
-      time: validTill, valid_until: validTill, expiry: validTill
+      to_email: recipientEmail,
+      email: recipientEmail,
+      recipient: recipientEmail,
+      account_id: accountId,
+      account: accountId,
+      user_id: accountId,
+      to_name: accountId === 'admin' ? 'Supervisor' : (accountId === '002' ? 'Cami' : 'Staff Member'),
+      otp_code: otpCode,
+      otp: otpCode,
+      code: otpCode,
+      passcode: otpCode,
+      time: validTill,
+      valid_until: validTill,
+      expiry: validTill
     },
   };
-  await fetch(EMAILJS_CONFIG.endpoint, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+
+  const response = await fetch(EMAILJS_CONFIG.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error('EmailJS Error Details:', errText);
+    throw new Error('Failed to send verification code via EmailJS.');
+  }
+
   return true;
 }

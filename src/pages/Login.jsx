@@ -18,6 +18,7 @@ export default function Login({ onLoginSuccess }) {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [staffId, setStaffId] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
@@ -31,10 +32,20 @@ export default function Login({ onLoginSuccess }) {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [otpInfoMsg, setOtpInfoMsg] = useState('');
 
-  // Staggered Mount Animations (Slides panel, then drops content)
+  // Restored Fallback Staff & Admin Account Registry
+  const fallbackUsers = {
+    '001': { id: '001', name: 'Kuya Bert', role: 'staff' },
+    '002': { id: '002', name: 'Cami', role: 'staff' },
+    '003': { id: '003', name: 'Custodial #003', role: 'staff' },
+    '004': { id: '004', name: 'Custodial #004', role: 'staff' },
+    '005': { id: '005', name: 'Custodial #005', role: 'staff' },
+    'admin': { id: 'admin', name: 'Supervisor', role: 'admin' },
+  };
+
+  // Staggered Mount Animations (Panel slides in, then elements drop one by one ending with logo)
   useEffect(() => {
     const panelTimer = setTimeout(() => setPanelMounted(true), 50);
-    const contentTimer = setTimeout(() => setContentMounted(true), 600);
+    const contentTimer = setTimeout(() => setContentMounted(true), 300);
     return () => { clearTimeout(panelTimer); clearTimeout(contentTimer); };
   }, []);
 
@@ -53,11 +64,13 @@ export default function Login({ onLoginSuccess }) {
     setErrorMsg('');
     setIsChecking(true);
 
+    const cleanId = staffId.trim().toLowerCase();
+
     try {
       const { data: dbUser } = await supabase
         .from('profiles')
         .select('*')
-        .ilike('id', staffId.trim())
+        .ilike('id', cleanId)
         .maybeSingle();
 
       if (dbUser && dbUser.password === password) {
@@ -76,8 +89,15 @@ export default function Login({ onLoginSuccess }) {
         setStagedUser(authenticatedUser);
         setShowCaptchaModal(true);
       } else {
-        if ((staffId === '001' || staffId === 'admin') && password === 'sjc1234') {
-          setStagedUser({ id: staffId, name: staffId === 'admin' ? 'Supervisor' : 'Kuya Bert', role: staffId === 'admin' ? 'admin' : 'staff' });
+        const matchedFallback = fallbackUsers[cleanId];
+
+        if (matchedFallback && password === 'sjc1234') {
+          if (isAdminMode && matchedFallback.role !== 'admin') {
+            setErrorMsg('Access Denied: Lacks Supervisor credentials.');
+            setIsChecking(false);
+            return;
+          }
+          setStagedUser(matchedFallback);
           setShowCaptchaModal(true);
         } else {
           setErrorMsg('Incorrect ID or password.');
@@ -126,7 +146,7 @@ export default function Login({ onLoginSuccess }) {
     if (otpInput.trim() === generatedOtp || otpInput.trim() === '123456') {
       setIsAuthenticating(true);
       setTimeout(() => {
-        onLoginSuccess(stagedUser, true);
+        onLoginSuccess(stagedUser, rememberMe);
       }, 2500); 
     } else {
       setErrorMsg('Invalid 2FA verification code.');
@@ -140,17 +160,15 @@ export default function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div className="h-screen w-screen relative overflow-hidden bg-slate-900 flex m-0 p-0 box-border">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900 flex m-0 p-0 box-border">
       
-      {/* Blurred Full-Screen Background Image */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
+      {/* Blurred Full-Screen Background Image strictly bounded to viewport */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-black/40 z-10" />
         <div 
-          className="absolute inset-0 z-0"
+          className="absolute inset-0 z-0 bg-cover bg-center"
           style={{ 
             backgroundImage: `url(${buildingBg})`, 
-            backgroundSize: 'cover', 
-            backgroundPosition: 'center',
             filter: 'blur(2px)'
           }}
         />
@@ -158,42 +176,62 @@ export default function Login({ onLoginSuccess }) {
 
       {/* Exactly 35% Left Sliding White Panel */}
       <div 
-        style={{ width: '35%', minWidth: '320px' }}
+        style={{ width: '35%', minWidth: '320px', maxWidth: '100%' }}
         className={`absolute left-0 top-0 bottom-0 bg-white z-20 shadow-[30px_0_60px_rgba(0,0,0,0.4)] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] overflow-hidden box-border ${
           panelMounted ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Dropping Content Wrapper */}
-        <div 
-          className={`h-full flex flex-col justify-center px-6 lg:px-10 py-10 overflow-y-auto overflow-x-hidden box-border transition-all duration-700 ease-out ${
-            contentMounted ? 'translate-y-0 opacity-100' : '-translate-y-16 opacity-0'
-          }`}
-        >
+        <div className="h-full flex flex-col justify-center px-6 lg:px-10 py-8 overflow-y-auto overflow-x-hidden box-border">
           
           <div className="flex flex-col items-center mb-6">
+            {/* Logo drops LAST at 650ms */}
             <div 
               onClick={handleLogoClick} 
-              className="w-24 h-24 bg-white rounded-[2rem] shadow-xl flex items-center justify-center p-4 mb-4 cursor-pointer active:scale-95 transition-transform border border-slate-100"
+              style={{ transitionDelay: '650ms' }}
+              className={`w-24 h-24 bg-white rounded-[2rem] shadow-xl flex items-center justify-center p-4 mb-4 cursor-pointer active:scale-95 transition-all duration-700 ease-out transform border border-slate-100 ${
+                contentMounted ? 'translate-y-0 opacity-100' : '-translate-y-14 opacity-0'
+              }`}
             >
               <img src={logoImg} alt="SJC Logo" className="w-full h-full object-contain" />
             </div>
-            <h1 className="text-2xl font-black text-slate-900 text-center tracking-tight">
-              {isAdminMode ? 'Admin Portal' : 'Sign In'}
-            </h1>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mt-1">
-              PHINMA Saint Jude College
-            </p>
+
+            {/* Header Titles drop at 520ms */}
+            <div 
+              style={{ transitionDelay: '520ms' }}
+              className={`flex flex-col items-center transition-all duration-700 ease-out transform ${
+                contentMounted ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
+              }`}
+            >
+              <h1 className="text-2xl font-black text-slate-900 text-center tracking-tight">
+                {isAdminMode ? 'Admin Portal' : 'Sign In'}
+              </h1>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mt-1">
+                PHINMA Saint Jude College
+              </p>
+            </div>
           </div>
 
           {errorMsg && (
-            <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl text-center animate-in slide-in-from-top-2">
+            <div 
+              style={{ transitionDelay: '450ms' }}
+              className={`mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl text-center transition-all duration-700 ease-out transform ${
+                contentMounted ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
+              }`}
+            >
               {errorMsg}
             </div>
           )}
 
           {!showTwoFactor ? (
             <form onSubmit={handlePasswordSubmit} className="space-y-4 flex flex-col w-full max-w-sm mx-auto box-border">
-              <div className="space-y-1.5">
+              {/* Staff ID Field drops at 380ms */}
+              <div 
+                style={{ transitionDelay: '380ms' }}
+                className={`space-y-1.5 transition-all duration-700 ease-out transform ${
+                  contentMounted ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
+                }`}
+              >
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   {isAdminMode ? 'Admin ID / Email' : 'Staff ID'}
                 </label>
@@ -206,12 +244,18 @@ export default function Login({ onLoginSuccess }) {
                     required 
                     disabled={isChecking}
                     className={`w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 transition disabled:opacity-50 ${isAdminMode ? 'focus:border-amber-500 focus:ring-amber-500/20' : 'focus:border-[#176e57] focus:ring-[#176e57]/20'}`} 
-                    placeholder={isAdminMode ? "admin" : "001"} 
+                    placeholder={isAdminMode ? "admin" : "001, 002, 003..."} 
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5 flex flex-col">
+              {/* Password & Remember Me drops at 260ms */}
+              <div 
+                style={{ transitionDelay: '260ms' }}
+                className={`space-y-1.5 flex flex-col transition-all duration-700 ease-out transform ${
+                  contentMounted ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
+                }`}
+              >
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Password</label>
                 <div className="relative">
                   <Lock className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -225,31 +269,58 @@ export default function Login({ onLoginSuccess }) {
                     placeholder="••••••••" 
                   />
                 </div>
-                <button type="button" className="text-[10px] font-bold text-slate-400 hover:text-[#176e57] transition-colors self-end mt-1">Forgot Password?</button>
+                
+                <div className="flex items-center justify-between mt-2 text-[10px] font-bold">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-500 hover:text-slate-700 select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={rememberMe} 
+                      onChange={(e) => setRememberMe(e.target.checked)} 
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-[#176e57] focus:ring-[#176e57] cursor-pointer"
+                    />
+                    <span>Remember Me</span>
+                  </label>
+                  <button type="button" className="text-slate-400 hover:text-[#176e57] transition-colors">Forgot Password?</button>
+                </div>
               </div>
 
-              <button 
-                type="submit" 
-                disabled={isChecking}
-                className={`w-full py-3.5 active:scale-95 text-white font-black rounded-2xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 mt-2 disabled:opacity-70 ${isAdminMode ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-900/20' : 'bg-[#176e57] hover:bg-[#135c49] shadow-emerald-900/20'}`}
+              {/* Secure Sign In Button drops at 140ms */}
+              <div 
+                style={{ transitionDelay: '140ms' }}
+                className={`transition-all duration-700 ease-out transform ${
+                  contentMounted ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
+                }`}
               >
-                {isChecking ? (
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    {isAdminMode && <Shield className="w-4 h-4" />}
-                    <span>Secure Sign In</span>
-                    {!isAdminMode && <ChevronRight className="w-4 h-4" />}
-                  </>
-                )}
-              </button>
+                <button 
+                  type="submit" 
+                  disabled={isChecking}
+                  className={`w-full py-3.5 active:scale-95 text-white font-black rounded-2xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 mt-2 disabled:opacity-70 ${isAdminMode ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-900/20' : 'bg-[#176e57] hover:bg-[#135c49] shadow-emerald-900/20'}`}
+                >
+                  {isChecking ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      {isAdminMode && <Shield className="w-4 h-4" />}
+                      <span>Secure Sign In</span>
+                      {!isAdminMode && <ChevronRight className="w-4 h-4" />}
+                    </>
+                  )}
+                </button>
+              </div>
               
               {isAdminMode && (
-                <button type="button" onClick={() => setIsAdminMode(false)} className="w-full py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-wider mt-2">Return to Staff Login</button>
+                <div 
+                  style={{ transitionDelay: '50ms' }}
+                  className={`transition-all duration-700 ease-out transform ${
+                    contentMounted ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
+                  }`}
+                >
+                  <button type="button" onClick={() => setIsAdminMode(false)} className="w-full py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-wider mt-2">Return to Staff Login</button>
+                </div>
               )}
             </form>
           ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-5 flex flex-col text-center w-full max-w-sm mx-auto animate-in fade-in slide-in-from-right-4 duration-500 box-border">
+            <form onSubmit={handleVerifyOtp} className="space-y-5 flex flex-col text-center w-full max-w-sm mx-auto box-border animate-in fade-in slide-in-from-right-4 duration-500">
               <div className="mx-auto w-14 h-14 bg-emerald-50 text-[#176e57] rounded-2xl flex items-center justify-center mb-1">
                 <ShieldCheck className="w-7 h-7" />
               </div>
@@ -265,7 +336,7 @@ export default function Login({ onLoginSuccess }) {
                 maxLength={6}
                 required 
                 autoFocus
-                className="w-full text-center tracking-[0.8em] py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-black text-slate-800 focus:outline-none focus:border-[#176e57] focus:ring-2 focus:ring-[#176e57]/20 transition" 
+                className="w-full text-center tracking-[0.4em] py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-black text-slate-800 focus:outline-none focus:border-[#176e57] focus:ring-2 focus:ring-[#176e57]/20 transition" 
                 placeholder="000000" 
               />
 
@@ -297,7 +368,7 @@ export default function Login({ onLoginSuccess }) {
         </div>
       </div>
 
-      {/* Interactive Full-Screen Loading Screen overlay triggered after 2FA */}
+      {/* Interactive Full-Screen Loading Screen overlay */}
       {isAuthenticating && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center animate-in fade-in duration-500">
           <div className="relative flex items-center justify-center mb-8">
